@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-def process_peaks_and_save(merged_df, threshold=27, window_size=10000, output_folder="output") -> int:
+def process_peaks_and_save(merged_df: pd.DataFrame, threshold=27, window_size=10000, output_folder="output") -> int:
     """
     使用时域窗口+阈值检测波峰，并保存达到条件的击球数据前后一秒的时域数据。
 
@@ -40,9 +40,12 @@ def process_peaks_and_save(merged_df, threshold=27, window_size=10000, output_fo
         # 选择Gx作为波峰检测的信号
         gx_values = window_data['Gx']  # Gx的数值直接使用
 
-        # 检查是否有值超过阈值
-        # 应该是中间位置值是否为最大值，同时中间位置值大于阈值
-        if gx_values.max() >= threshold:
+        # 选择中心位置
+        mid_index = len(window_data) // 2
+        mid_value = gx_values.iloc[mid_index]
+
+        # 中间位置值是否为最大值，同时中间位置值大于阈值
+        if mid_value == gx_values.max() and mid_value > threshold:
             peak_value = gx_values.max()
             peak_index = gx_values.idxmax()
 
@@ -56,9 +59,10 @@ def process_peaks_and_save(merged_df, threshold=27, window_size=10000, output_fo
             # segment_data.to_csv(output_file, index=False)
             print(f"✅ 保存数据：{output_file}")
             total_peak += 1
-
-        # 跳过当前窗口（窗口之间不重叠）
-        i = window_data.index[-1] + 1
+            # 跳过当前窗口，不重复捕获击球点
+            i = window_data.index[-1]
+        # 窗口前移
+        i += 1
     return total_peak
 
 def process_multiple_files(input_folder, output_folder, threshold=27, window_size=10000):
@@ -100,10 +104,10 @@ def process_multiple_files(input_folder, output_folder, threshold=27, window_siz
 if __name__ == "__main__":
     # 设置输入文件夹和输出文件夹路径
     INPUT_FOLDER = r"..\data\processed_fir\merged_files"
-    OUTPUT_FOLDER = r"..\data\processed_fir\peaks_2"
+    OUTPUT_FOLDER = r"..\data\processed_fir\peaks2"
 
     # 处理所有文件并执行波峰检测
-    process_multiple_files(INPUT_FOLDER, OUTPUT_FOLDER, threshold=27, window_size=10000)
+    process_multiple_files(INPUT_FOLDER, OUTPUT_FOLDER, threshold=27, window_size=2000)
     print("✅ 波峰检测完成，开始训练模型...")
     # 在此处可以插入调用训练模型的代码
     print("✅ 训练完成！")

@@ -35,7 +35,7 @@ def merge_sensor_pair(acc_file, gyro_file, output_file):
 
     # 将合并后的数据保存到 output_file
     try:
-        # df_merged.to_csv(output_file, index=False)
+        df_merged.to_csv(output_file, index=False)
         print(f"✅ 合并后的数据已保存至：{output_file}")
     except Exception as e:
         print(f"❌ 保存 CSV 文件 {output_file} 出错：{e}")
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     # 修改下面的路径为你的实际文件夹路径
     ACC_FOLDER = r"..\data\raw\accelerometer"
     GYRO_FOLDER = r"..\data\raw\gyroscope"
-    OUTPUT_FOLDER = r"..\data\processed_fir\merged_files_2"
+    OUTPUT_FOLDER = r"..\data\processed_fir\merged_files"
 
     # 创建输出文件夹（如果不存在）
     if not os.path.exists(OUTPUT_FOLDER):
