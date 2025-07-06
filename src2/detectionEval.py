@@ -1,53 +1,26 @@
+#!/usr/bin/env python3.8
+# -*- coding: utf-8 -*-
+
+r"""
+@DATE    :   2025-07-06 11:33:01
+@Author  :   Chen
+@File    :   src2\detectionEval.py
+@Software:   VSCode
+@Description:
+    击球动作检测算法准确率计算
+"""
+
 import pickle
 import sys
 from typing import Callable, Dict, List, Union
 import pandas as pd
+import matplotlib.pyplot as plt
+plt.ion()
 
 sys.path.append("..\\")
+from src2 import detectionF
 from Util.Json import loadJson
 from Util.Path import getFPsByEndwith, getFPsByName
-
-def peakF(merged_df: pd.DataFrame, threshold: int= 27, window_size: int= 2000) -> int:
-    """
-    使用时域窗口+阈值检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
-
-    Args:
-        merged_df (pd.DataFrame): 包含 gx 的数据框架
-        threshold (int, optional): 检测阈值. Defaults to 27.
-        window_size (int, optional): 窗口大小. Defaults to 4000.
-
-    Returns:
-        int: 检测到的中值时间戳
-    """
-    # 获取数据的总长度
-    total_length = len(merged_df)
-    # 每次跳过窗口，避免重叠
-    i = 0
-    while i < total_length:
-        current_timestamp = merged_df.iloc[i]['unixTimestamp_acc']
-
-        start_time = current_timestamp
-        end_time = current_timestamp + window_size
-
-        # 过滤当前窗口内的数据
-        window_data = merged_df[(merged_df['unixTimestamp_acc'] >= start_time) & (merged_df['unixTimestamp_acc'] <= end_time)]
-
-        if len(window_data) == 0:
-            i += 1
-            continue
-
-        # 选择Gx作为波峰检测的信号
-        gx_values = window_data['Gx']  # Gx的数值直接使用
-
-        # 检查是否有值超过阈值
-        if gx_values.max() >= threshold:
-            peak_index = window_data.index.get_loc(gx_values.idxmax())
-            # 返回中间时间戳
-            return merged_df.iloc[peak_index]['unixTimestamp_acc']
-
-        # 跳过当前窗口（窗口之间不重叠）
-        i = window_data.index[-1] + 1
-    return -1
 
 class DataTimeSet:
     """
@@ -121,12 +94,12 @@ def loadNameToDataTimeSetDict(loadPath: str) -> Union[Dict[str, DataTimeSet], No
         nameToDataTimeSetDict = pickle.load(file)
     return nameToDataTimeSetDict
 
-def peakEvalAcc(peakF: Callable[[pd.DataFrame], float], checkHalfRange: int, nameToDataTimeSetDict: Dict[str, DataTimeSet]) -> float:
+def detectionEvalAcc(detectionF: Callable[[pd.DataFrame], float], checkHalfRange: int, nameToDataTimeSetDict: Dict[str, DataTimeSet]) -> float:
     """
     计算检测函数准确率
 
     Args:
-        peakF (Callable[[pd.DataFrame], float]): 检测函数
+        detectionF (Callable[[pd.DataFrame], float]): 检测函数
             输入 数据框架
             生成 中间时间戳
         checkHalfRange (int): 测试范围半径（ms）
@@ -138,7 +111,7 @@ def peakEvalAcc(peakF: Callable[[pd.DataFrame], float], checkHalfRange: int, nam
     # 测试总数
     allNum = 0
     # 检测总数
-    peakNum = 0
+    detectionNum = 0
     # 遍历数据单元
     for name, dataTimeSetDict in nameToDataTimeSetDict.items():
         allNum += len(dataTimeSetDict.timeList)
@@ -152,20 +125,25 @@ def peakEvalAcc(peakF: Callable[[pd.DataFrame], float], checkHalfRange: int, nam
             endT = midTimestamp + checkHalfRange
             testDataframe = dataframe[(dataframe['unixTimestamp_acc'] >= startT) & (dataframe['unixTimestamp_acc'] <= endT)]
             # 检测
-            peakTimestamp = peakF(testDataframe)
+            detectionTimestamp = detectionF(testDataframe)
+
+            # 可视化
+            testDataframe[["Gx", "Gy", "Gz"]].plot(kind= "line", title= "testDataPlot", figsize= (8, 4))
+
             # 是否在合理范围内
-            if abs(peakTimestamp - midTimestamp) < 500:
-                peakNum += 1
+            if abs(detectionTimestamp - midTimestamp) < 500:
+                detectionNum += 1
                 print(f"{index} check!")
         print(f"{name} 检测完成。")
 
-    return float(peakNum) / float(allNum)
+    return float(detectionNum) / float(allNum)
 
 DATASET_PATH = r"G:\Badminton\BADS_CLL"
 INIT_DATA_PATH = r"..\data\processed_fir\merged_files"
 SAVE_PATH = r"..\src2\theSet\set1.pkl"
 LOAD_PATH = r"..\src2\theSet\set1.pkl"
 LOAD = True
+DETECTION_F = detectionF.windowPeak
 
 def main() -> None:
     # 获取名称与数据时间集合字典
@@ -176,8 +154,8 @@ def main() -> None:
         nameToDataTimeSetDict = loadNameToDataTimeSetDict(LOAD_PATH)
     if nameToDataTimeSetDict is None:
         return
-    # 8 秒检测范围
-    print(peakEvalAcc(peakF, 2000, nameToDataTimeSetDict))
+    # 4 秒检测范围
+    print(detectionEvalAcc(DETECTION_F, 4000, nameToDataTimeSetDict))
 
 if __name__ == "__main__":
     main()
