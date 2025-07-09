@@ -13,7 +13,7 @@ r"""
 import sys
 sys.path.append("..\\")
 import pickle
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List, Tuple, Union
 import pandas as pd
 import matplotlib.pyplot as plt
 from src2.DetectionPlot import compareTestDetection
@@ -93,7 +93,7 @@ def loadNameToDataTimeSetDict(loadPath: str) -> Union[Dict[str, DataTimeSet], No
         nameToDataTimeSetDict = pickle.load(file)
     return nameToDataTimeSetDict
 
-def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plot: bool= False) -> float:
+def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plotList: Union[List[str], None]= None) -> Tuple[int, int]:
     """
     计算检测函数准确率
 
@@ -102,10 +102,10 @@ def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bia
         checkHalfRange (int): 测试范围半径（ms）
         bias (int): 容许的最大偏差时间（ms）
         nameToDataTimeSetDict (Dict[str, DataTimeSet]): 数据集数据名称 与 时间戳与原始数据集合 字典
-        plot (bool): 是否可视化. Defaults to False.
+        plotList (Union[List[str], None]): 可视化列表. Defaults to None.
 
     Returns:
-        float: 准确率
+        Tuple[int, int]: 检测数与总数
     """
     # 测试总数
     allNum = 0
@@ -128,10 +128,10 @@ def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bia
             # 检测
             detectionT = detectionF.check(testDF) # type: ignore
 
-            # 可视化
-            if plot:
+            # 可视化失败类型
+            if plotList and (detectionT == -1 or abs(detectionT - midT) > bias):
                 detectionDF = dataframe[(dataframe['unixTimestamp_acc'] >= detectionT - checkHalfRange) & (dataframe['unixTimestamp_acc'] <= detectionT + checkHalfRange)] # type: ignore
-                compareTestDetection(testDF, midT, detectionDF, detectionT, [detectionF._stand], index= "unixTimestamp_acc") # type: ignore
+                compareTestDetection(testDF, midT, detectionDF, detectionT, plotList, index= "unixTimestamp_acc") # type: ignore
 
             # 检测失败 是否在合理范围内
             if detectionT == -1 or abs(detectionT - midT) > bias:
@@ -142,7 +142,7 @@ def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bia
             print(f"{index} check!")
         print(f"{name} 检测完成。")
 
-    return float(detectionNum) / float(allNum)
+    return detectionNum, allNum
 
 DATASET_PATH = r"G:\Badminton\BADS_CLL"
 INIT_DATA_PATH = r"..\data\processed_fir\merged_files"
@@ -160,9 +160,14 @@ def main() -> None:
     if nameToDataTimeSetDict is None:
         return
     # 构建检测函数 angularSpeedX Gx
-    detectionF = DetectionF.WindowPeak("Gz", windowSize= 2000, threshold= 20, isABS= False)
+    standUnits = [
+        DetectionF.WindowPeak.StandUnit("angularSpeedY", 24, True),
+    ]
+    detectionF = DetectionF.WindowPeakS(standUnits, windowSize= 2000)
     # 8 秒检测范围
-    print(detectionEvalAcc(detectionF, 4000, 200, nameToDataTimeSetDict, False))
+    plotList = [standUnit.stand for standUnit in standUnits]
+    detectionNum, allNum = detectionEvalAcc(detectionF, 4000, 500, nameToDataTimeSetDict, )
+    print(f"detectionNum: {detectionNum}, allNum: {allNum}, acc: {float(detectionNum) / float(allNum)}")
 
 if __name__ == "__main__":
     main()

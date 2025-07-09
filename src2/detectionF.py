@@ -10,27 +10,47 @@ r"""
     击球点检测算法
 """
 
+from typing import List
 import pandas as pd
+
 
 class DetectionF:
     """
     检测函数。
     """
-    def __init__(self, stand: str, threshold: int= 27, windowSize: int= 2000, isABS: bool= False, *params) -> None:
+    THE_TIMESTAMP = 'unixTimestamp_acc'
+
+    class StandUnit:
+        """
+        标准单元
+        """
+        def __init__(self, stand: str, threshold: int, isABS: bool= False) -> None:
+            """
+            初始化
+
+            Args:
+                stand (str): 标准名称
+                threshold (int): 阈值
+                isABS (bool, optional): 是否绝对值. Defaults to False.
+            """
+            self.stand = stand
+            self.threshold = threshold
+            self.isABS = isABS
+
+    def __init__(self, standUnits: List[StandUnit], windowSize: int= 2000, *params) -> None:
         """
         初始化
 
         Args:
-            stand (str): 检测标准
-            threshold (int, optional): 检测阈值. Defaults to 27.
+            standUnits (List[StandUnit): 检测标准列表
             windowSize (int, optional): 检测窗口. Defaults to 2000.
-            isABS (bool, optional): 是否绝对值. Defaults to False.
             *params (any): 其余参数
         """
-        self._stand = stand
-        self._threshold = threshold
+        self._standUnits = standUnits
         self._windowSize = windowSize
-        self._isABS = isABS
+
+    def _judge(self, windowDF: pd.DataFrame) -> int:
+        return -1
 
     def check(self, df: pd.DataFrame) -> int:
         """
@@ -42,60 +62,178 @@ class DetectionF:
         Returns:
             int: 检测结果
         """
+        # 获取数据的总长度
+        total_length = len(df)
+        # 每次跳过窗口，避免重叠
+        i = 0
+        while i < total_length:
+            current_timestamp = df.iloc[i][self.THE_TIMESTAMP]
+
+            start_time = current_timestamp
+            end_time = current_timestamp + self._windowSize
+
+            # 过滤当前窗口内的数据
+            window_data = df[(df[self.THE_TIMESTAMP] >= start_time) & (df[self.THE_TIMESTAMP] <= end_time)]
+
+            if len(window_data) == 0:
+                i += 1
+                continue
+
+            # 判断
+            judgeResult = self._judge(window_data)
+            if judgeResult != -1:
+                return judgeResult
+
+            # 跳过当前窗口（窗口之间不重叠）
+            i += len(window_data)
         return -1
 
 class WindowPeak(DetectionF):
     """
     时域窗口+阈值检测击球波峰
     """
-    def __init__(self, stand: str, threshold: int= 27, windowSize: int= 2000, isABS: bool= False) -> None:
-        """
-        初始化
 
-        Args:
-            stand (str): 检测标准
-            threshold (int, optional): 检测阈值. Defaults to 27.
-            windowSize (int, optional): 检测窗口. Defaults to 2000.
-            isABS (bool, optional): 是否绝对值. Defaults to False.
-        """
-        super().__init__(stand, threshold, windowSize, isABS)
-
-    def check(self, df: pd.DataFrame) -> int:
+    def _judge(self, windowDF: pd.DataFrame) -> int:
         """
         使用时域窗口+阈值检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
 
         Args:
-            df (pd.DataFrame): 数据
+            windowDF (pd.DataFrame): 窗口数据
 
         Returns:
             int: 检测到的中值时间戳
         """
-        # 获取数据的总长度
-        total_length = len(df)
-        # 每次跳过窗口，避免重叠
-        i = 0
-        while i < total_length:
-            current_timestamp = df.iloc[i]['unixTimestamp_acc']
+        # 选择作为波峰检测的信号
+        theValues = windowDF[self._standUnits[0].stand]
 
-            start_time = current_timestamp
-            end_time = current_timestamp + self._windowSize
+        # 是否绝对值
+        if self._standUnits[0].isABS: theValues = theValues.abs()
+        # 检查是否有值超过阈值
+        if theValues.max() >= self._standUnits[0].threshold:
+            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+        return -1
 
-            # 过滤当前窗口内的数据
-            window_data = df[(df['unixTimestamp_acc'] >= start_time) & (df['unixTimestamp_acc'] <= end_time)]
+class WindowPeakS(DetectionF):
+    """
+    时域窗口+阈值平方检测击球波峰
+    """
 
-            if len(window_data) == 0:
-                i += 1
-                continue
+    def _judge(self, windowDF: pd.DataFrame) -> int:
+        """
+        使用时域窗口+阈值检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
 
+        Args:
+            windowDF (pd.DataFrame): 窗口数据
+
+        Returns:
+            int: 检测到的中值时间戳
+        """
+        # 选择作为波峰检测的信号 并 平方
+        theValues = windowDF[self._standUnits[0].stand] ** 2
+
+        # 检查是否有值超过阈值
+        if theValues.max() >= self._standUnits[0].threshold:
+            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+        return -1
+
+class WindowPeakMS(DetectionF):
+    """
+    时域窗口+多阈值平方检测击球波峰
+    """
+
+    def _judge(self, windowDF: pd.DataFrame) -> int:
+        """
+        使用时域窗口+多阈值检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
+
+        Args:
+            windowDF (pd.DataFrame): 窗口数据
+
+        Returns:
+            int: 检测到的中值时间戳
+        """
+        # 目标时间戳
+        midTimestamp = 0
+        for index, standUnit in enumerate(self._standUnits):
             # 选择作为波峰检测的信号
-            gx_values = window_data[self._stand]
+            theValues = windowDF[standUnit.stand]
+            # 是否绝对值 平方
+            if standUnit.isABS:
+                theValues = theValues ** 2
+            # 是否小于阈值
+            if theValues.max() < standUnit.threshold:
+                return -1
 
-            # 是否绝对值
-            if self._isABS: gx_values = gx_values.abs()
-            # 检查是否有值超过阈值
-            if gx_values.max() >= self._threshold:
-                return int(window_data.loc[gx_values.idxmax()]['unixTimestamp_acc'])
+            # 获取检测到的时间戳
+            theTimestamp = int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+            # 基准时间戳
+            if index == 0:
+                midTimestamp = theTimestamp
+                continue
+            # 检测波峰距离是否过大
+            if abs(midTimestamp - theTimestamp) > 2000:
+                return -1
+            # 计算平均值
+            midTimestamp = (midTimestamp * index + theTimestamp) // (index + 1)
 
-            # 跳过当前窗口（窗口之间不重叠）
-            i += len(window_data)
+        return midTimestamp
+
+class WindowPeakDiff(DetectionF):
+    """
+    时域窗口 + 阈值检测击球波峰 + 差分
+    """
+
+    class DiffStandUnit(DetectionF.StandUnit):
+        """
+        差分标准单元
+        """
+        def __init__(self, stand: str, threshold: int, diffThreshold: int, diffDistance: int, isABS: bool= False) -> None:
+            """
+            初始化
+
+            Args:
+                stand (str): 标准名称
+                threshold (int): 阈值
+                diffThreshold (int): 差分阈值
+                diffDistance (int): 差分距离
+                isABS (bool, optional): 是否绝对值. Defaults to False.
+            """
+            super().__init__(stand, threshold, isABS)
+            self.diffThreshold = diffThreshold
+            self.diffDistance = diffDistance
+
+    def __init__(self, diffStandUnit: List[DiffStandUnit], windowSize: int= 2000) -> None:
+        """
+        初始化
+
+        Args:
+            diffStandUnit (List[DiffStandUnit]): 差分标准列表
+            windowSize (int, optional): 检测窗口. Defaults to 2000.
+        """
+        super().__init__([], windowSize)
+        self.diffStandUnit = diffStandUnit
+
+    def _judge(self, windowDF: pd.DataFrame) -> int:
+        """
+        使用时域窗口+阈值检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
+
+        Args:
+            windowDF (pd.DataFrame): 窗口数据
+
+        Returns:
+            int: 检测到的中值时间戳
+        """
+        # 选择作为波峰检测的信号
+        theValues = windowDF[self.diffStandUnit[0].stand]
+
+        # 是否绝对值
+        if self.diffStandUnit[0].isABS: theValues = theValues.abs()
+
+        # 获取差分大小
+        diffIloc = windowDF.index.get_loc(theValues.idxmax()) - self.diffStandUnit[0].diffDistance
+        theDiff = self.diffStandUnit[0].diffThreshold
+        if diffIloc >= 0:
+            theDiff = abs(theValues.max() - theValues.iloc[diffIloc])
+        # 检查是否有值超过阈值
+        if theValues.max() >= self.diffStandUnit[0].threshold and theDiff >= self.diffStandUnit[0].diffThreshold:
+            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
         return -1
