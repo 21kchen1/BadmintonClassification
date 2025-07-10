@@ -24,7 +24,7 @@ class DetectionF:
         """
         标准单元
         """
-        def __init__(self, stand: str, threshold: int, isABS: bool= False) -> None:
+        def __init__(self, stand: str, threshold: int, isABS: bool= False, bias: int= 0) -> None:
             """
             初始化
 
@@ -32,10 +32,12 @@ class DetectionF:
                 stand (str): 标准名称
                 threshold (int): 阈值
                 isABS (bool, optional): 是否绝对值. Defaults to False.
+                bias (int, optional): 偏差位移. Defaults to 0.
             """
             self.stand = stand
             self.threshold = threshold
             self.isABS = isABS
+            self.bias = bias
 
     def __init__(self, standUnits: List[StandUnit], windowSize: int= 2000, *params) -> None:
         """
@@ -104,13 +106,14 @@ class WindowPeak(DetectionF):
             int: 检测到的中值时间戳
         """
         # 选择作为波峰检测的信号
-        theValues = windowDF[self._standUnits[0].stand]
+        standUnit = self._standUnits[0]
+        theValues = windowDF[standUnit.stand]
 
         # 是否绝对值
-        if self._standUnits[0].isABS: theValues = theValues.abs()
+        if standUnit.isABS: theValues = theValues.abs()
         # 检查是否有值超过阈值
-        if theValues.max() >= self._standUnits[0].threshold:
-            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+        if theValues.max() >= standUnit.threshold:
+            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) + standUnit.bias #type: ignore
         return -1
 
 class WindowPeakS(DetectionF):
@@ -128,12 +131,13 @@ class WindowPeakS(DetectionF):
         Returns:
             int: 检测到的中值时间戳
         """
+        standUnit = self._standUnits[0]
         # 选择作为波峰检测的信号 并 平方
-        theValues = windowDF[self._standUnits[0].stand] ** 2
+        theValues = windowDF[standUnit.stand] ** 2
 
         # 检查是否有值超过阈值
-        if theValues.max() >= self._standUnits[0].threshold:
-            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+        if theValues.max() >= standUnit.threshold:
+            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) + standUnit.bias #type: ignore
         return -1
 
 class WindowPeakMS(DetectionF):
@@ -167,13 +171,13 @@ class WindowPeakMS(DetectionF):
             theTimestamp = int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
             # 基准时间戳
             if index == 0:
-                midTimestamp = theTimestamp
+                midTimestamp = theTimestamp + standUnit.bias
                 continue
             # 检测波峰距离是否过大
             if abs(midTimestamp - theTimestamp) > 2000:
                 return -1
             # 计算平均值
-            midTimestamp = (midTimestamp * index + theTimestamp) // (index + 1)
+            midTimestamp = (midTimestamp * index + theTimestamp + standUnit.bias) // (index + 1)
 
         return midTimestamp
 
@@ -186,7 +190,7 @@ class WindowPeakDiff(DetectionF):
         """
         差分标准单元
         """
-        def __init__(self, stand: str, threshold: int, diffThreshold: int, diffDistance: int, isABS: bool= False) -> None:
+        def __init__(self, stand: str, threshold: int, diffThreshold: int, diffDistance: int, isABS: bool= False, bias: int= 0) -> None:
             """
             初始化
 
@@ -196,8 +200,9 @@ class WindowPeakDiff(DetectionF):
                 diffThreshold (int): 差分阈值
                 diffDistance (int): 差分距离
                 isABS (bool, optional): 是否绝对值. Defaults to False.
+                bias (int, optional): 偏差位移. Defaults to 0.
             """
-            super().__init__(stand, threshold, isABS)
+            super().__init__(stand, threshold, isABS, bias)
             self.diffThreshold = diffThreshold
             self.diffDistance = diffDistance
 
