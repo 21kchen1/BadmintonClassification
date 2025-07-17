@@ -161,12 +161,15 @@ def main() -> None:
         return
     # 构建检测函数 angularSpeedX Gx
     standUnits = [
-        DetectionF.WindowPeak.StandUnit("angularSpeedY", 21, True, 190),
+        DetectionF.WindowPeak.StandUnit("angularSpeedY", 21, True, 150),
+        DetectionF.WindowPeak.StandUnit("angularSpeedX", 21, True, 0),
+        DetectionF.WindowPeak.StandUnit("angularSpeedZ", 21, True, 0),
     ]
     detectionF = DetectionF.WindowPeakS(standUnits, windowSize= 2000)
+    detectionF = DetectionF.WindowMaxEnergyPeak(standUnits, windowSize= 2000)
     # 8 秒检测范围
     plotList = [standUnit.stand for standUnit in standUnits]
-    detectionNum, allNum = detectionEvalAcc(detectionF, 4000, 200, nameToDataTimeSetDict, )
+    detectionNum, allNum = detectionEvalAcc(detectionF, 4000, 500, nameToDataTimeSetDict, )
     print(f"detectionNum: {detectionNum}, allNum: {allNum}, acc: {float(detectionNum) / float(allNum)}")
 
 if __name__ == "__main__":

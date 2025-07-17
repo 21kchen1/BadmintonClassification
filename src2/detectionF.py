@@ -234,11 +234,51 @@ class WindowPeakDiff(DetectionF):
         if self.diffStandUnit[0].isABS: theValues = theValues.abs()
 
         # 获取差分大小
-        diffIloc = windowDF.index.get_loc(theValues.idxmax()) - self.diffStandUnit[0].diffDistance
+        diffIloc = windowDF.index.get_loc(theValues.idxmax())
+        # 如果差分异常，则选取最前一个来判断
+        if not isinstance(diffIloc, int):
+            diffIloc = self.diffStandUnit[0].diffDistance
+        diffIloc -= self.diffStandUnit[0].diffDistance
         theDiff = self.diffStandUnit[0].diffThreshold
         if diffIloc >= 0:
             theDiff = abs(theValues.max() - theValues.iloc[diffIloc])
         # 检查是否有值超过阈值
         if theValues.max() >= self.diffStandUnit[0].threshold and theDiff >= self.diffStandUnit[0].diffThreshold:
             return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+        return -1
+
+class WindowMaxEnergyPeak(DetectionF):
+    """
+    时域窗口+最大能量峰值检测
+    """
+
+    def _judge(self, windowDF: pd.DataFrame) -> int:
+        """
+        时域窗口+最大能量峰值检测，并保存达到条件的击球数据前后一秒的时域数据。
+
+        Args:
+            windowDF (pd.DataFrame): 窗口数据
+
+        Returns:
+            int: 检测到的中值时间戳
+        """
+        # 最大能量
+        maxEnergy = 0
+        # 最大频道
+        maxChannel = 0
+        for index, standUnit in enumerate(self._standUnits):
+            # 评分计算能量
+            theEnergy = (windowDF[standUnit.stand] ** 2).sum()
+            if maxEnergy > theEnergy:
+                continue
+            maxEnergy = theEnergy
+            maxChannel = index
+
+        # 选取最大能量
+        standUnit = self._standUnits[maxChannel]
+        theValues = windowDF[standUnit.stand] ** 2
+
+        # 检查是否有值超过阈值
+        if theValues.max() >= standUnit.threshold:
+            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) + standUnit.bias #type: ignore
         return -1
