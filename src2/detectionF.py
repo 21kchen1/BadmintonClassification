@@ -10,6 +10,9 @@ r"""
     击球点检测算法
 """
 
+from copy import deepcopy
+from math import inf
+import math
 from typing import List
 import pandas as pd
 
@@ -89,6 +92,82 @@ class DetectionF:
             # 跳过当前窗口（窗口之间不重叠）
             i += len(window_data)
         return -1
+
+    def _getWindowMaxTimestampDIY(self, windowDF: pd.DataFrame) -> int:
+        """
+        自定义方法获取窗口数据的最大数据时间戳
+
+        Args:
+            windowDF (pd.DataFrame): 窗口数据
+
+        Returns:
+            int: 最大数据时间戳
+        """
+        # 第一个数据作为基准单元
+        standUnit = self._standUnits[0]
+        return int(windowDF.loc[(windowDF[standUnit.stand] ** 2).idxmax()][self.THE_TIMESTAMP]) #type: ignore
+
+    def midCheck(self, df: pd.DataFrame) -> int:
+        """
+        区间中点检测
+
+        Args:
+            df (pd.DataFrame): 需要检测的数据
+
+        Returns:
+            int: 检测结果
+        """
+        halfWindowSize = self._windowSize // 2
+        # 确定第一个检测点时间戳
+        checkT = int(df[df[self.THE_TIMESTAMP] >= df.iloc[0][self.THE_TIMESTAMP] + halfWindowSize].iloc[0][self.THE_TIMESTAMP])
+        # 遍历
+        for index in range(0, len(df)):
+            # 如果早于检测点则跳过
+            if df.iloc[index][self.THE_TIMESTAMP] < checkT:
+                continue
+            # 获取窗口数据
+            starT = checkT - halfWindowSize
+            endT = checkT + halfWindowSize
+            windowData = df[(df[self.THE_TIMESTAMP] >= starT) & (df[self.THE_TIMESTAMP] <= endT)]
+            # 获取窗口最大值的时间戳
+            # 这个最大值应该是可以自定义的
+            windowMaxTimestamp = self._getWindowMaxTimestampDIY(windowData)
+            # print((windowData[standUnit.stand] ** 2).max())
+            # 如果中间时间戳数据不是最大值
+            # 且晚于当前时间戳
+            # print(f"windowMaxTimestamp: {windowMaxTimestamp}, checkT: {checkT}")
+            if windowMaxTimestamp > checkT:
+                # 更新检查时间戳 跳到下一个极值
+                checkT = windowMaxTimestamp
+                continue
+
+            # 保存当前时间戳
+            midT = deepcopy(checkT)
+            # 获取后续数据
+            afterWindow = df[df[self.THE_TIMESTAMP] >= midT + self._windowSize // 2]
+            # 超过数据范围
+            if len(afterWindow) <= 0:
+                checkT = math.inf
+            # 跳过当前窗口
+            else:
+                checkT = int(afterWindow.iloc[0][self.THE_TIMESTAMP])
+
+            # 如果中间时间戳数据不是最大值
+            # 且早于当前时间戳
+            if windowMaxTimestamp < midT:
+                # 跳过当前窗口
+                continue
+
+            # 判断中值是否符合条件
+            judgeResult = self._judge(windowData)
+
+            # 不符合条件
+            if judgeResult == -1:
+                continue
+            # 符合条件
+            return judgeResult
+        return -1
+
 
 class WindowPeak(DetectionF):
     """
@@ -276,7 +355,7 @@ class WindowMaxEnergyPeak(DetectionF):
 
         # 选取最大能量
         standUnit = self._standUnits[maxChannel]
-        theValues = windowDF[standUnit.stand] ** 2
+        theValues = (windowDF[standUnit.stand] ** 2) if standUnit.isABS else windowDF[standUnit.stand]
 
         # 检查是否有值超过阈值
         if theValues.max() >= standUnit.threshold:

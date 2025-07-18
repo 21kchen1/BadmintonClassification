@@ -93,12 +93,12 @@ def loadNameToDataTimeSetDict(loadPath: str) -> Union[Dict[str, DataTimeSet], No
         nameToDataTimeSetDict = pickle.load(file)
     return nameToDataTimeSetDict
 
-def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plotList: Union[List[str], None]= None) -> Tuple[int, int]:
+def detectionEvalAcc(detectionF: Callable[[pd.DataFrame], int], checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plotList: Union[List[str], None]= None) -> Tuple[int, int]:
     """
     计算检测函数准确率
 
     Args:
-        detectionF (DetectionF.DetectionF): 检测函数
+        detectionF (Callable[[pd.DataFrame], int]): 检测函数
         checkHalfRange (int): 测试范围半径（ms）
         bias (int): 容许的最大偏差时间（ms）
         nameToDataTimeSetDict (Dict[str, DataTimeSet]): 数据集数据名称 与 时间戳与原始数据集合 字典
@@ -113,12 +113,13 @@ def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bia
     detectionNum = 0
     # 遍历数据单元
     for name, dataTimeSetDict in nameToDataTimeSetDict.items():
-        # if "Back" in name: continue
 
         allNum += len(dataTimeSetDict.timeList)
         print(f"检测 {name}。。。")
         # 对每个时间戳测试
         for index, midT in enumerate(dataTimeSetDict.timeList):
+            # if "Man_Low_ForehandHigh_LeiYang_2_1" in name and index == 6:
+            #     print()
             # 原始数据框架
             dataframe = dataTimeSetDict.dataFrame
             # 起始数据
@@ -126,7 +127,7 @@ def detectionEvalAcc(detectionF: DetectionF.DetectionF, checkHalfRange: int, bia
             endT = midT + checkHalfRange
             testDF = dataframe[(dataframe['unixTimestamp_acc'] >= startT) & (dataframe['unixTimestamp_acc'] <= endT)] # type: ignore
             # 检测
-            detectionT = detectionF.check(testDF) # type: ignore
+            detectionT = detectionF(testDF) # type: ignore
 
             # 可视化失败类型
             if plotList and (detectionT == -1 or abs(detectionT - midT) > bias):
@@ -162,14 +163,17 @@ def main() -> None:
     # 构建检测函数 angularSpeedX Gx
     standUnits = [
         DetectionF.WindowPeak.StandUnit("angularSpeedY", 21, True, 150),
-        DetectionF.WindowPeak.StandUnit("angularSpeedX", 21, True, 0),
-        DetectionF.WindowPeak.StandUnit("angularSpeedZ", 21, True, 0),
+        # DetectionF.WindowPeak.StandUnit("angularSpeedX", 21, True, 0),
+        # DetectionF.WindowPeak.StandUnit("angularSpeedZ", 21, True, 0),
+        # DetectionF.WindowPeak.StandUnit("Gy", 200, True, 0),
+        # DetectionF.WindowPeak.StandUnit("Gx", 400, True, 0),
+        # DetectionF.WindowPeak.StandUnit("Gz", 400, True, 0),
     ]
     detectionF = DetectionF.WindowPeakS(standUnits, windowSize= 2000)
-    detectionF = DetectionF.WindowMaxEnergyPeak(standUnits, windowSize= 2000)
+    # detectionF = DetectionF.WindowMaxEnergyPeak(standUnits, windowSize= 2000)
     # 8 秒检测范围
     plotList = [standUnit.stand for standUnit in standUnits]
-    detectionNum, allNum = detectionEvalAcc(detectionF, 4000, 500, nameToDataTimeSetDict, )
+    detectionNum, allNum = detectionEvalAcc(detectionF.midCheck, 4000, 500, nameToDataTimeSetDict, )
     print(f"detectionNum: {detectionNum}, allNum: {allNum}, acc: {float(detectionNum) / float(allNum)}")
 
 if __name__ == "__main__":
