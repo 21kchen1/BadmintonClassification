@@ -7,7 +7,7 @@ from scipy.fft import fft
 def compute_fft_features(signal, fs=100):
     """
     对一维时域信号进行 FFT 变换，并提取频域特征。
-    
+
     参数：
       signal: numpy 数组，表示时域信号
       fs: 采样率，默认100Hz
@@ -30,7 +30,7 @@ def extract_fft_features_from_row(row):
     """
     针对 CSV 中单个样本（行），对每个传感器通道（Ax, Ay, Az, angularSpeedX, angularSpeedY, angularSpeedZ）
     进行 FFT 特征提取。假设这些列中存储的是 JSON 格式的字符串。
-    
+
     返回：
       一个字典，键名为 "{通道}_fft_mean" 等特征名称。
     """
@@ -92,19 +92,21 @@ def process_fft_features(input_csv, output_csv):
         print(f"❌ 保存 CSV 文件 {output_csv} 出错：{e}")
 
 if __name__ == "__main__":
-    TRAIN_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train.csv"
-    VERIFY_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify.csv"
-    TEST_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_test.csv"
+    TRAIN_INPUT_CSV = r"..\Result\Data\Test_Process.csv"
+    # TRAIN_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train.csv"
+    # VERIFY_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify.csv"
+    # TEST_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_test.csv"
 
-    TRAIN_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft.csv"
-    VERIFY_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft.csv"
-    TEST_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft.csv"
+    TRAIN_OUTPUT_CSV = r"..\Result\Data\Test_FFT.csv"
+    # TRAIN_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft.csv"
+    # VERIFY_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft.csv"
+    # TEST_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft.csv"
 
     print("🚀 开始处理训练集数据...")
     process_fft_features(TRAIN_INPUT_CSV, TRAIN_OUTPUT_CSV)
 
-    print("🚀 开始处理验证集数据...")
-    process_fft_features(VERIFY_INPUT_CSV, VERIFY_OUTPUT_CSV)
+    # print("🚀 开始处理验证集数据...")
+    # process_fft_features(VERIFY_INPUT_CSV, VERIFY_OUTPUT_CSV)
 
-    print("🚀 开始处理测试集数据...")
-    process_fft_features(TEST_INPUT_CSV, TEST_OUTPUT_CSV)
+    # print("🚀 开始处理测试集数据...")
+    # process_fft_features(TEST_INPUT_CSV, TEST_OUTPUT_CSV)

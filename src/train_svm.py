@@ -79,13 +79,13 @@ def save_model(model, model_path):
 
 if __name__ == "__main__":
     # 设定训练集、验证集和测试集 CSV 文件路径
-    TRAIN_DATA_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft_normalized.csv"
-    VERIFY_DATA_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft_normalized.csv"
-    TEST_DATA_CSV  = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft_normalized.csv"
-    
+    TRAIN_DATA_CSV = "../data/processed/processed_train_fft_normalized.csv"
+    VERIFY_DATA_CSV = "../data/processed/processed_verify_fft_normalized.csv"
+    TEST_DATA_CSV  = "../data/processed/processed_test_fft_normalized.csv"
+
     # 设置模型保存路径
-    MODEL_SAVE_PATH = "D:/vscode_work/badminton_classification/models/svm_model.pkl"
-    
+    MODEL_SAVE_PATH = "../models/svm_model1.pkl"
+
     # 定义需要使用的特征列（与归一化后的 CSV 文件中的标题一致）
     feature_columns = [
         "Ax_fft_mean", "Ax_fft_std", "Ax_fft_max", "Ax_dom_bin",
@@ -95,7 +95,7 @@ if __name__ == "__main__":
         "angularSpeedY_fft_mean", "angularSpeedY_fft_std", "angularSpeedY_fft_max", "angularSpeedY_dom_bin",
         "angularSpeedZ_fft_mean", "angularSpeedZ_fft_std", "angularSpeedZ_fft_max", "angularSpeedZ_dom_bin"
     ]
-    
+
     # 加载训练集、验证集和测试集数据
     print("🚀 加载训练集数据...")
     df_train = load_data(TRAIN_DATA_CSV)
@@ -103,27 +103,27 @@ if __name__ == "__main__":
     df_verify = load_data(VERIFY_DATA_CSV)
     print("🚀 加载测试集数据...")
     df_test = load_data(TEST_DATA_CSV)
-    
+
     if df_train is None or df_verify is None or df_test is None:
         exit(1)
-    
+
     # 分离特征和标签
     X_train, y_train = prepare_data(df_train, feature_columns, label_column="actionType")
     X_verify, y_verify = prepare_data(df_verify, feature_columns, label_column="actionType")
     X_test, y_test = prepare_data(df_test, feature_columns, label_column="actionType")
-    
+
     if X_train is None or y_train is None or X_verify is None or y_verify is None or X_test is None or y_test is None:
         exit(1)
-    
+
     # 训练 SVM 模型
     svm_model = train_svm(X_train, y_train)
     if svm_model is None:
         exit(1)
-    
+
     # 评估数据集、验证集和测试集
     evaluate_model(svm_model, X_train, y_train, data_type="训练集")
     evaluate_model(svm_model, X_verify, y_verify, data_type="验证集")
     evaluate_model(svm_model, X_test, y_test, data_type="测试集")
-    
+
     # 保存模型
     save_model(svm_model, MODEL_SAVE_PATH)

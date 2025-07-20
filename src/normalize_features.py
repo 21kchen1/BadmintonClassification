@@ -107,14 +107,18 @@ def normalize_datasets(train_csv, verify_csv, test_csv,
 
 if __name__ == "__main__":
     # 输入路径
-    TRAIN_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft.csv"
-    VERIFY_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft.csv"
-    TEST_INPUT_CSV  = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft.csv"
+    TRAIN_INPUT_CSV = r"..\Result\Data\Test_FFT.csv"
+    VERIFY_INPUT_CSV = r"..\Result\Data\Test_FFT.csv"
+    TEST_INPUT_CSV  = r"..\Result\Data\Test_FFT.csv"
+    # TRAIN_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft.csv"
+    # VERIFY_INPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft.csv"
+    # TEST_INPUT_CSV  = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft.csv"
 
     # 输出路径
-    TRAIN_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft_normalized.csv"
-    VERIFY_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft_normalized.csv"
-    TEST_OUTPUT_CSV  = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft_normalized.csv"
+    TRAIN_OUTPUT_CSV = r"..\Result\Data\Test_Normalize.csv"
+    # TRAIN_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft_normalized.csv"
+    # VERIFY_OUTPUT_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft_normalized.csv"
+    # TEST_OUTPUT_CSV  = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft_normalized.csv"
 
     # 特征列
     feature_columns = [
@@ -128,5 +132,5 @@ if __name__ == "__main__":
 
     print("🚀 开始对训练集、验证集和测试集数据进行标准化归一化...")
     normalize_datasets(TRAIN_INPUT_CSV, VERIFY_INPUT_CSV, TEST_INPUT_CSV,
-                       TRAIN_OUTPUT_CSV, VERIFY_OUTPUT_CSV, TEST_OUTPUT_CSV,
+                       TRAIN_OUTPUT_CSV, None, None,
                        feature_columns)

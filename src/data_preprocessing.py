@@ -54,17 +54,17 @@ def process_single_json(file_path):
         # 提取记录名称（来自 info 部分）
         info = record.get("info", {})
         record_name = info.get("recordName", "unknown")
-        
+
         # 处理 label 部分：如果没有则用空字典
         label_info = record.get("label") or {}
         action_type = label_info.get("actionType", "unknown")
-        
+
         # 获取 data 部分
         data_section = record.get("data")
         if not data_section:
             print(f"⚠ 记录 {i+1} ({record_name}) 中没有 'data' 部分，跳过该记录")
             continue
-        
+
         # 提取加速度计数据（ACCELEROMETER）
         accel = data_section.get("ACCELEROMETER")
         if accel is None:
@@ -74,7 +74,7 @@ def process_single_json(file_path):
         accel_Gy = accel.get("Gy", [])
         accel_Gz = accel.get("Gz", [])
         accel_timestamp = accel.get("timestamp", [])
-        
+
         # 提取陀螺仪数据（GYROSCOPE）
         gyro = data_section.get("GYROSCOPE")
         if gyro is None:
@@ -84,7 +84,7 @@ def process_single_json(file_path):
         gyro_Y = gyro.get("angularSpeedY", [])
         gyro_Z = gyro.get("angularSpeedZ", [])
         gyro_timestamp = gyro.get("timestamp", [])
-        
+
         # 检查必须数据是否存在（至少有时间戳和部分传感器数据）
         if not (accel_timestamp and gyro_timestamp):
             print(f"⚠ 记录 {i+1} ({record_name}) 中缺少时间戳，跳过该记录")
@@ -117,12 +117,12 @@ def process_directory(data_dir):
     if not os.path.exists(data_dir):
         print(f"❌ 目录 {data_dir} 不存在！")
         return pd.DataFrame()
-    
+
     json_files = [filename for filename in os.listdir(data_dir) if filename.endswith(".json")]
     if not json_files:
         print(f"❌ 在目录 {data_dir} 中没有找到 JSON 文件！")
         return pd.DataFrame()
-    
+
     for filename in json_files:
         file_path = os.path.join(data_dir, filename)
         print(f"📌 读取文件: {filename}")
@@ -143,7 +143,7 @@ def preprocess_and_save(train_dir, test_dir, train_save_path, test_save_path):
         print(f"✅ 训练集数据已保存至: {train_save_path}")
     else:
         print("❌ 训练集数据为空，请检查数据目录！")
-        
+
     print("🚀 开始处理测试集数据...")
     df_test = process_directory(test_dir)
     if not df_test.empty:
@@ -155,11 +155,14 @@ def preprocess_and_save(train_dir, test_dir, train_save_path, test_save_path):
 if __name__ == "__main__":
     # 请确保你已经在项目根目录下运行该脚本
     # 定义训练集和测试集的原始 JSON 数据目录（绝对路径推荐）
-    TRAIN_DATA_DIR = "D:/vscode_work/badminton_classification/data/raw/train/"
-    TEST_DATA_DIR  = "D:/vscode_work/badminton_classification/data/raw/test/"
-    
+    # TRAIN_DATA_DIR = "D:/vscode_work/badminton_classification/data/raw/train/"
+    TRAIN_DATA_DIR = r"G:\Badminton\BADS_CLL_TEST"
+    # TEST_DATA_DIR  = "D:/vscode_work/badminton_classification/data/raw/test/"
+
     # 定义处理后 CSV 数据的保存路径
-    TRAIN_SAVE_PATH = "D:/vscode_work/badminton_classification/data/processed/processed_train.csv"
-    TEST_SAVE_PATH  = "D:/vscode_work/badminton_classification/data/processed/processed_test.csv"
-    
-    preprocess_and_save(TRAIN_DATA_DIR, TEST_DATA_DIR, TRAIN_SAVE_PATH, TEST_SAVE_PATH)
+    # TRAIN_SAVE_PATH = "D:/vscode_work/badminton_classification/data/processed/processed_train.csv"
+    TRAIN_SAVE_PATH = r"..\Result\Data\Test_Process.csv"
+    # TEST_SAVE_PATH  = "D:/vscode_work/badminton_classification/data/processed/processed_test.csv"
+
+    # preprocess_and_save(TRAIN_DATA_DIR, TEST_DATA_DIR, TRAIN_SAVE_PATH, TEST_SAVE_PATH)
+    preprocess_and_save(TRAIN_DATA_DIR, None, TRAIN_SAVE_PATH, None)
