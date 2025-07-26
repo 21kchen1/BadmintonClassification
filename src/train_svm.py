@@ -5,6 +5,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import classification_report, accuracy_score
 import pickle
 
+
 def load_data(csv_path):
     """读取 CSV 文件，返回 DataFrame"""
     print(f"🚀 正在加载数据文件：{csv_path}")
@@ -16,7 +17,7 @@ def load_data(csv_path):
         print(f"❌ 读取 CSV 文件 {csv_path} 出错：{e}")
         return None
 
-def prepare_data(df, feature_columns, label_column="actionType"):
+def prepare_data(df: pd.DataFrame, feature_columns, label_column="actionType"):
     """
     根据指定的特征列和标签列，将 DataFrame 分离为特征矩阵 X 和标签向量 y。
     """
@@ -26,7 +27,7 @@ def prepare_data(df, feature_columns, label_column="actionType"):
         return None, None
     try:
         X = df[feature_columns].values
-        y = df[label_column].values
+        y = np.array(df[label_column].values)
         print(f"✅ 特征数据维度：{X.shape}，标签数量：{len(y)}")
         return X, y
     except Exception as e:
@@ -115,15 +116,39 @@ if __name__ == "__main__":
     if X_train is None or y_train is None or X_verify is None or y_verify is None or X_test is None or y_test is None:
         exit(1)
 
+    X_all = np.concatenate((X_train, X_verify, X_test), axis= 0)
+    Y_all = np.concatenate((y_train, y_verify, y_test), axis= 0)
+
+    # 检查是否有 None 值
+    if X_all is None or Y_all is None:
+        exit(1)
+
+    # 打乱数据
+    indices = np.arange(X_all.shape[0])
+    np.random.shuffle(indices)  # 打乱索引
+
+    X_all = X_all[indices]
+    Y_all = Y_all[indices]
+
+    # 重新划分数据
+    train_ratio = 0.8  # 训练集比例
+    train_size = int(X_all.shape[0] * train_ratio)
+
+    X_train_new = X_all[:train_size]
+    y_train_new = Y_all[:train_size]
+
+    X_test_new = X_all[train_size:]
+    y_test_new = Y_all[train_size:]
+
     # 训练 SVM 模型
-    svm_model = train_svm(X_train, y_train)
+    svm_model = train_svm(X_train_new, y_train_new)
     if svm_model is None:
         exit(1)
 
     # 评估数据集、验证集和测试集
-    evaluate_model(svm_model, X_train, y_train, data_type="训练集")
-    evaluate_model(svm_model, X_verify, y_verify, data_type="验证集")
-    evaluate_model(svm_model, X_test, y_test, data_type="测试集")
+    evaluate_model(svm_model, X_train_new , y_train_new, data_type="训练集")
+    # evaluate_model(svm_model, X_verify, y_verify, data_type="验证集")
+    evaluate_model(svm_model, X_test_new, y_test_new, data_type="测试集")
 
     # 保存模型
-    save_model(svm_model, MODEL_SAVE_PATH)
+    # save_model(svm_model, MODEL_SAVE_PATH)
