@@ -9,3 +9,24 @@ r"""
 @Description:
     pandas dataframe 的辅助函数
 """
+
+from typing import Dict
+import pandas as pd
+
+def getSubDataFrameDict(dataFrameDict: Dict[str, pd.DataFrame], startT: int, endT: int) -> Dict[str, pd.DataFrame]:
+    """
+    获取子数据框架字典
+
+    Args:
+        dataFrameDict (Dict[str, pd.DataFrame]): 数据框架字典
+        startT (int): 开始数据
+        endT (int): 结束时间
+
+    Returns:
+        Dict[str, pd.DataFrame]: 子时间框架字典
+    """
+    subDataFrameDict = {}
+    for typeName, dataFrame in dataFrameDict.items():
+        subDataFrameDict[typeName] = dataFrame[(dataFrame["unixTimestamp"] >= startT) & (dataFrame["unixTimestamp"] <= endT)]
+
+    return subDataFrameDict

@@ -13,30 +13,34 @@ r"""
 from copy import deepcopy
 from math import inf
 import math
-from typing import List
+from typing import Dict, List
 import pandas as pd
+
+from Util.DataFrame import getSubDataFrameDict
 
 
 class DetectionF:
     """
     检测函数。
     """
-    THE_TIMESTAMP = 'unixTimestamp_acc'
+    THE_TIMESTAMP = 'unixTimestamp'
 
     class StandUnit:
         """
         标准单元
         """
-        def __init__(self, stand: str, threshold: int, isABS: bool= False, bias: int= 0) -> None:
+        def __init__(self, typeName: str, stand: str, threshold: int, isABS: bool= False, bias: int= 0) -> None:
             """
             初始化
 
             Args:
+                typeName (str): 数据类型名称
                 stand (str): 标准名称
                 threshold (int): 阈值
                 isABS (bool, optional): 是否绝对值. Defaults to False.
                 bias (int, optional): 偏差位移. Defaults to 0.
             """
+            self.typeName = typeName
             self.stand = stand
             self.threshold = threshold
             self.isABS = isABS
@@ -54,84 +58,99 @@ class DetectionF:
         self._standUnits = standUnits
         self._windowSize = windowSize
 
-    def _judge(self, windowDF: pd.DataFrame) -> int:
+    def _judge(self, windowDFD: Dict[str, pd.DataFrame]) -> int:
+        """
+        判断函数
+
+        Args:
+            windowDFD (Dict[str, pd.DataFrame]): 数据框架字典
+
+        Returns:
+            int: 判断结果
+        """
         return -1
 
-    def check(self, df: pd.DataFrame) -> int:
+    def check(self, dfd: Dict[str, pd.DataFrame]) -> int:
         """
         检测
 
         Args:
-            df (pd.DataFrame): 需要检测的数据
+            dfd (pd.DataFrame): 需要检测的数据字典
 
         Returns:
             int: 检测结果
         """
+        # 第一个标准作为主标准
+        mdf = dfd[self._standUnits[0].typeName]
         # 获取数据的总长度
-        total_length = len(df)
+        total_length = len(mdf)
         # 每次跳过窗口，避免重叠
         i = 0
         while i < total_length:
-            current_timestamp = df.iloc[i][self.THE_TIMESTAMP]
+            current_timestamp = mdf.iloc[i][self.THE_TIMESTAMP]
 
             start_time = current_timestamp
             end_time = current_timestamp + self._windowSize
 
             # 过滤当前窗口内的数据
-            window_data = df[(df[self.THE_TIMESTAMP] >= start_time) & (df[self.THE_TIMESTAMP] <= end_time)]
+            subDFD = getSubDataFrameDict(dfd, start_time, end_time)
+            # window_data = df[(df[self.THE_TIMESTAMP] >= start_time) & (df[self.THE_TIMESTAMP] <= end_time)]
 
-            if len(window_data) == 0:
+            if len(subDFD[self._standUnits[0].typeName]) == 0:
                 i += 1
                 continue
 
             # 判断
-            judgeResult = self._judge(window_data)
+            judgeResult = self._judge(dfd)
             if judgeResult != -1:
                 return judgeResult
 
             # 跳过当前窗口（窗口之间不重叠）
-            i += len(window_data)
+            i += len(subDFD[self._standUnits[0].typeName])
         return -1
 
-    def _getWindowMaxTimestampDIY(self, windowDF: pd.DataFrame) -> int:
+    def _getWindowMaxTimestampDIY(self, windowDFD: Dict[str, pd.DataFrame]) -> int:
         """
         自定义方法获取窗口数据的最大数据时间戳
 
         Args:
-            windowDF (pd.DataFrame): 窗口数据
+            windowDFD (pd.DataFrame): 窗口数据框架字典
 
         Returns:
             int: 最大数据时间戳
         """
         # 第一个数据作为基准单元
         standUnit = self._standUnits[0]
-        return int(windowDF.loc[(windowDF[standUnit.stand] ** 2).idxmax()][self.THE_TIMESTAMP]) #type: ignore
+        theDF = windowDFD[standUnit.typeName]
+        return int(theDF.loc[(theDF[standUnit.stand] ** 2).idxmax()][self.THE_TIMESTAMP]) #type: ignore
 
-    def midCheck(self, df: pd.DataFrame) -> int:
+    def midCheck(self, dfd: Dict[str, pd.DataFrame]) -> int:
         """
         区间中点检测
 
         Args:
-            df (pd.DataFrame): 需要检测的数据
+            dfd (pd.DataFrame): 需要检测的数据框架字典
 
         Returns:
             int: 检测结果
         """
         halfWindowSize = self._windowSize // 2
+        # 选择第一个标准为主标准
+        mdf = dfd[self._standUnits[0].typeName]
         # 确定第一个检测点时间戳
-        checkT = int(df[df[self.THE_TIMESTAMP] >= df.iloc[0][self.THE_TIMESTAMP] + halfWindowSize].iloc[0][self.THE_TIMESTAMP])
+        checkT = int(mdf[mdf[self.THE_TIMESTAMP] >= mdf.iloc[0][self.THE_TIMESTAMP] + halfWindowSize].iloc[0][self.THE_TIMESTAMP])
         # 遍历
-        for index in range(0, len(df)):
+        for index in range(0, len(mdf)):
             # 如果早于检测点则跳过
-            if df.iloc[index][self.THE_TIMESTAMP] < checkT:
+            if mdf.iloc[index][self.THE_TIMESTAMP] < checkT:
                 continue
             # 获取窗口数据
-            starT = checkT - halfWindowSize
-            endT = checkT + halfWindowSize
-            windowData = df[(df[self.THE_TIMESTAMP] >= starT) & (df[self.THE_TIMESTAMP] <= endT)]
+            starT = int(checkT - halfWindowSize)
+            endT = int(checkT + halfWindowSize)
+            # windowData = df[(df[self.THE_TIMESTAMP] >= starT) & (df[self.THE_TIMESTAMP] <= endT)]
+            windowDFD = getSubDataFrameDict(dfd, starT, endT)
             # 获取窗口最大值的时间戳
-            # 这个最大值应该是可以自定义的
-            windowMaxTimestamp = self._getWindowMaxTimestampDIY(windowData)
+            windowMaxTimestamp = self._getWindowMaxTimestampDIY(windowDFD)
             # print((windowData[standUnit.stand] ** 2).max())
             # 如果中间时间戳数据不是最大值
             # 且晚于当前时间戳
@@ -144,7 +163,7 @@ class DetectionF:
             # 保存当前时间戳
             midT = deepcopy(checkT)
             # 获取后续数据
-            afterWindow = df[df[self.THE_TIMESTAMP] >= midT + self._windowSize // 2]
+            afterWindow = mdf[mdf[self.THE_TIMESTAMP] >= midT + self._windowSize // 2]
             # 超过数据范围
             if len(afterWindow) <= 0:
                 checkT = math.inf
@@ -159,7 +178,7 @@ class DetectionF:
                 continue
 
             # 判断中值是否符合条件
-            judgeResult = self._judge(windowData)
+            judgeResult = self._judge(windowDFD)
 
             # 不符合条件
             if judgeResult == -1:
@@ -200,36 +219,66 @@ class WindowPeakS(DetectionF):
     时域窗口+阈值平方检测击球波峰
     """
 
-    def _judge(self, windowDF: pd.DataFrame) -> int:
+    def _judge(self, windowDFD: Dict[str, pd.DataFrame]) -> int:
         """
         使用时域窗口+阈值检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
 
         Args:
-            windowDF (pd.DataFrame): 窗口数据
+            windowDFD (pd.DataFrame): 窗口数据字典
 
         Returns:
             int: 检测到的中值时间戳
         """
         standUnit = self._standUnits[0]
         # 选择作为波峰检测的信号 并 平方
-        theValues = windowDF[standUnit.stand] ** 2
+        theValues = windowDFD[standUnit.typeName][standUnit.stand] ** 2
 
         # 检查是否有值超过阈值
         if theValues.max() >= standUnit.threshold:
-            return int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) + standUnit.bias #type: ignore
+            return int(windowDFD[standUnit.typeName].loc[theValues.idxmax()][self.THE_TIMESTAMP]) + standUnit.bias #type: ignore
         return -1
+
+class WindowPeakSA(DetectionF):
+    """
+    时域窗口+阈值平方+音频检测击球波峰
+    """
+
+    def _judge(self, windowDFD: Dict[str, pd.DataFrame]) -> int:
+        """
+        使用时域窗口+阈值平方+音频检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
+
+        Args:
+            windowDFD (pd.DataFrame): 窗口数据字典
+
+        Returns:
+            int: 检测到的中值时间戳
+        """
+        standUnit = self._standUnits[0]
+        # 选择作为波峰检测的信号 并 平方
+        theValues = windowDFD[standUnit.typeName][standUnit.stand] ** 2
+        # 最大值的时间戳
+        maxTimestamp = int(windowDFD[standUnit.typeName].loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+
+        audioValues = windowDFD["AUDIO"]["values"]
+        audioMaxTimestamp = int(windowDFD["AUDIO"].loc[audioValues.idxmax()][self.THE_TIMESTAMP]) if len(windowDFD["AUDIO"]) > 0 else -math.inf #type: ignore
+
+        # 检查是否有值超过阈值
+        if theValues.max() >= standUnit.threshold and abs(audioMaxTimestamp - maxTimestamp) < 2000 and audioValues.max() >= 30:
+            return maxTimestamp + standUnit.bias
+        return -1
+
 
 class WindowPeakMS(DetectionF):
     """
     时域窗口+多阈值平方检测击球波峰
     """
 
-    def _judge(self, windowDF: pd.DataFrame) -> int:
+    def _judge(self, windowDFD: Dict[str, pd.DataFrame]) -> int:
         """
         使用时域窗口+多阈值检测击球波峰，并保存达到条件的击球数据前后一秒的时域数据。
 
         Args:
-            windowDF (pd.DataFrame): 窗口数据
+            windowDFD (pd.DataFrame): 窗口数据框架字典
 
         Returns:
             int: 检测到的中值时间戳
@@ -238,16 +287,14 @@ class WindowPeakMS(DetectionF):
         midTimestamp = 0
         for index, standUnit in enumerate(self._standUnits):
             # 选择作为波峰检测的信号
-            theValues = windowDF[standUnit.stand]
-            # 是否绝对值 平方
-            if standUnit.isABS:
-                theValues = theValues ** 2
+            theDF = windowDFD[standUnit.typeName]
+            theValues = theDF[standUnit.stand] ** 2
             # 是否小于阈值
             if theValues.max() < standUnit.threshold:
                 return -1
 
             # 获取检测到的时间戳
-            theTimestamp = int(windowDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
+            theTimestamp = int(theDF.loc[theValues.idxmax()][self.THE_TIMESTAMP]) #type: ignore
             # 基准时间戳
             if index == 0:
                 midTimestamp = theTimestamp + standUnit.bias
@@ -269,11 +316,12 @@ class WindowPeakDiff(DetectionF):
         """
         差分标准单元
         """
-        def __init__(self, stand: str, threshold: int, diffThreshold: int, diffDistance: int, isABS: bool= False, bias: int= 0) -> None:
+        def __init__(self, typeName: str, stand: str, threshold: int, diffThreshold: int, diffDistance: int, isABS: bool= False, bias: int= 0) -> None:
             """
             初始化
 
             Args:
+                typeName (str): 类型数据名称
                 stand (str): 标准名称
                 threshold (int): 阈值
                 diffThreshold (int): 差分阈值
@@ -281,7 +329,7 @@ class WindowPeakDiff(DetectionF):
                 isABS (bool, optional): 是否绝对值. Defaults to False.
                 bias (int, optional): 偏差位移. Defaults to 0.
             """
-            super().__init__(stand, threshold, isABS, bias)
+            super().__init__(typeName, stand, threshold, isABS, bias)
             self.diffThreshold = diffThreshold
             self.diffDistance = diffDistance
 

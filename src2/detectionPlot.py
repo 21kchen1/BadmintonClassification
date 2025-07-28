@@ -10,20 +10,24 @@ r"""
     可视化
 """
 
-from typing import List
+import sys
+
+sys.path.append("..\\")
+from typing import Dict, List
 import pandas as pd
+from src2 import DetectionF
 import matplotlib.pyplot as plt
 
-def compareTestDetection(testDF: pd.DataFrame, testMid: int, detectionDF: pd.DataFrame, detectionMid: int, columns: List[str], index: str) -> None:
+def compareTestDetection(testDFD: Dict[str, pd.DataFrame], testMid: int, detectionDFD: Dict[str, pd.DataFrame], detectionMid: int, columns: List[DetectionF.DetectionF.StandUnit], index: str) -> None:
     """
     比较测试与检测数据
 
     Args:
-        testDF (pd.DataFrame): 测试数据
+        testDFD (Dict[str, pd.DataFrame]): 测试数据
         testMid (int): 测试中点时间戳
-        detectionDF (pd.DataFrame): 检测数据
+        detectionDFD (Dict[str, pd.DataFrame]): 检测数据
         detectionMid (int): 检测中点时间戳
-        columns (List[str]): 需要显示的列的名称列表
+        columns (List[DetectionF.DetectionF.StandUnit]): 需要显示的列的数据单元
         index (str): 对应的下标名称
     """
 
@@ -32,7 +36,7 @@ def compareTestDetection(testDF: pd.DataFrame, testMid: int, detectionDF: pd.Dat
     # 测试子图
     plt.subplot(1, 2, 1)
     for column in columns:
-        plt.plot(testDF[index], testDF[column], label= column, marker= "o")
+        plt.plot(testDFD[column.typeName][index], testDFD[column.typeName][column.stand], label= f"{column.typeName} {column.stand}", marker= "o")
     plt.axvline(x= testMid, color= "red", linestyle= "--", label= "testMid")
     plt.title("test")
     plt.legend()
@@ -40,7 +44,7 @@ def compareTestDetection(testDF: pd.DataFrame, testMid: int, detectionDF: pd.Dat
     # 检测子图
     plt.subplot(1, 2, 2)
     for column in columns:
-        plt.plot(detectionDF[index], detectionDF[column], label= column, marker= "o")
+        plt.plot(detectionDFD[column.typeName][index], detectionDFD[column.typeName][column.stand], label= f"{column.typeName} {column.stand}", marker= "o")
     plt.axvline(x= detectionMid, color= "red", linestyle= "--", label= "detectionMid")
     plt.title("detection")
     plt.legend()

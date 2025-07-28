@@ -11,7 +11,9 @@ r"""
 """
 
 import sys
+
 sys.path.append("..\\")
+from Util.DataFrame import getSubDataFrameDict
 import pickle
 from typing import Callable, Dict, List, Tuple, Union
 import pandas as pd
@@ -25,24 +27,25 @@ class DataTimeSet:
     """
     时间戳与原始数据集合
     """
-    def __init__(self, indexAndTimeList: List[Tuple[int, int]], dataFrame: pd.DataFrame) -> None:
+    def __init__(self, indexAndTimeList: List[Tuple[int, int]], dataFrameDict: Dict[str, pd.DataFrame]) -> None:
         """
         初始化
 
         Args:
             indexAndTimeList (List[Tuple[int, int]]): 下标与时间戳元组列表
-            dataFrame (pd.DataFrame): 原始数据框架
+            dataFrameDict (Dict[str, pd.DataFrame]): 原始数据框架字典
         """
         self.indexAndTimeList = indexAndTimeList
-        self.dataFrame = dataFrame
+        self.dataFrameDict = dataFrameDict
 
-def getNameToDataTimeSetDict(datasetRoot: str, initDataRoot: str, savePath: Union[str, None]= None) -> Union[Dict[str, DataTimeSet], None]:
+def getNameToDataTimeSetDict(datasetRoot: str, initDataRoot: str, typeNames: List[str], savePath: Union[str, None]= None) -> Union[Dict[str, DataTimeSet], None]:
     """
     获取 数据集数据名称 与 时间戳与原始数据集合 字典
 
     Args:
         datasetRoot (str): 数据集根路径
         initDataRoot (str): 原始数据根路径
+        typeNames (List[str]): 需要的类型数据名称
         savePath (Union[str, None], optional): 字典保存路径. Defaults to None.
 
     Returns:
@@ -62,14 +65,32 @@ def getNameToDataTimeSetDict(datasetRoot: str, initDataRoot: str, savePath: Unio
         timeList = [(index, theJson["info"]["startTimestamp"] + 1000) for index, theJson in enumerate(jsons) if not theJson["data"] is None]
 
         # 获取对应原始数据路径
-        initDataPaths = getFPsByName(initDataRoot, recordName, first= True)
-        if len(initDataPaths) != 1:
+        initDataPaths = getFPsByName(initDataRoot, recordName, first= False)
+        if len(initDataPaths) != 10:
             print(f"原始数据异常: {recordName}")
             return None
-        dataFrame = pd.read_csv(initDataPaths[0])
+        # 根据需要的类型数据构建字典
+        dataFrameDict = {}
+        for typeName in typeNames:
+            aimInitDataPath = [initDataPath for initDataPath in initDataPaths if typeName in initDataPath][0]
+            dataFrameDict[typeName] = pd.read_csv(aimInitDataPath)
+
+        # 音频数据单独处理
+        theAudio = "AUDIO"
+        audioDict = {
+            "unixTimestamp": [],
+            "values": []
+        }
+        for theJson in jsons:
+            if theJson["data"] is None:
+                continue
+            audioData = theJson["data"]["AUDIO"]
+            audioDict["unixTimestamp"].extend(audioData["timestamp"])
+            audioDict["values"].extend(audioData["values"])
+        dataFrameDict[theAudio] = pd.DataFrame(audioDict)
 
         # 生成键值对
-        nameToDataTimeSetDict[recordName] = DataTimeSet(timeList, dataFrame)
+        nameToDataTimeSetDict[recordName] = DataTimeSet(timeList, dataFrameDict)
         print(f"{recordName} 载入完成")
 
     # 保存
@@ -93,7 +114,7 @@ def loadNameToDataTimeSetDict(loadPath: str) -> Union[Dict[str, DataTimeSet], No
         nameToDataTimeSetDict = pickle.load(file)
     return nameToDataTimeSetDict
 
-def detectionEvalAcc(detectionF: Callable[[pd.DataFrame], int], checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plotList: Union[List[str], None]= None) -> Tuple[int, int, int]:
+def detectionEvalAcc(detectionF: Callable[[Dict[str, pd.DataFrame]], int], checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plotList: Union[List[DetectionF.DetectionF.StandUnit], None]= None) -> Tuple[int, int, int]:
     """
     计算检测函数准确率
 
@@ -102,7 +123,7 @@ def detectionEvalAcc(detectionF: Callable[[pd.DataFrame], int], checkHalfRange: 
         checkHalfRange (int): 测试范围半径（ms）
         bias (int): 容许的最大偏差时间（ms）
         nameToDataTimeSetDict (Dict[str, DataTimeSet]): 数据集数据名称 与 时间戳与原始数据集合 字典
-        plotList (Union[List[str], None]): 可视化列表. Defaults to None.
+        plotList (Union[List[DetectionF.DetectionF.StandUnit], None]): 可视化列表. Defaults to None.
 
     Returns:
         Tuple[int, int]: 检测数、总数、漏警数
@@ -114,22 +135,22 @@ def detectionEvalAcc(detectionF: Callable[[pd.DataFrame], int], checkHalfRange: 
     # 漏检总数
     missAlarmNum = 0
     # 遍历数据单元
-    for name, dataTimeSetDict in nameToDataTimeSetDict.items():
+    for name, dataTimeSet in nameToDataTimeSetDict.items():
 
-        allNum += len(dataTimeSetDict.indexAndTimeList)
+        allNum += len(dataTimeSet.indexAndTimeList)
         print(f"检测 {name}。。。")
         # 对每个时间戳测试
-        for index, midT in dataTimeSetDict.indexAndTimeList:
+        for index, midT in dataTimeSet.indexAndTimeList:
             # if "Man_Low_ForehandHigh_LeiYang_2_1" in name and index == 6:
             #     print()
-            # 原始数据框架
-            dataframe = dataTimeSetDict.dataFrame
+            # 原始数据框架字典
+            dataFrameDict = dataTimeSet.dataFrameDict
             # 起始数据
             startT = midT - checkHalfRange
             endT = midT + checkHalfRange
-            testDF = dataframe[(dataframe['unixTimestamp_acc'] >= startT) & (dataframe['unixTimestamp_acc'] <= endT)] # type: ignore
+            testDFD = getSubDataFrameDict(dataFrameDict, startT, endT)
             # 检测
-            detectionT = detectionF(testDF) # type: ignore
+            detectionT = detectionF(testDFD)
 
             # 检测失败 是否在合理范围内
             if detectionT == -1 or abs(detectionT - midT) > bias:
@@ -137,8 +158,8 @@ def detectionEvalAcc(detectionF: Callable[[pd.DataFrame], int], checkHalfRange: 
                 if detectionT == -1: missAlarmNum += 1
                 # 可视化失败类型
                 if plotList:
-                    detectionDF = dataframe[(dataframe['unixTimestamp_acc'] >= detectionT - checkHalfRange) & (dataframe['unixTimestamp_acc'] <= detectionT + checkHalfRange)] # type: ignore
-                    compareTestDetection(testDF, midT, detectionDF, detectionT, plotList, index= "unixTimestamp_acc") # type: ignore
+                    detectionDFD = getSubDataFrameDict(dataFrameDict, detectionT - checkHalfRange, detectionT + checkHalfRange)
+                    compareTestDetection(testDFD, midT, detectionDFD, detectionT, plotList, index= "unixTimestamp") # type: ignore
                 print(f"{index} miss!")
                 continue
             # 检测成功
@@ -148,34 +169,34 @@ def detectionEvalAcc(detectionF: Callable[[pd.DataFrame], int], checkHalfRange: 
 
     return detectionNum, allNum, missAlarmNum
 
-DATASET_PATH = r"G:\Badminton\BADS_CLL_E_CLEAN"
-INIT_DATA_PATH = r"..\data\processed_fir\merged_files"
-SAVE_PATH = r"..\src2\theSet\set2.pkl"
-LOAD_PATH = r"..\src2\theSet\set2.pkl"
+DATASET_PATH = r"G:\Badminton\BADS_CLL_E_CLEAN_A"
+INIT_DATA_PATH = r"G:\Badminton\DataSetProcess"
+TYPE_DATAS = ["ACCELEROMETER", "GYROSCOPE"]
+SAVE_PATH = r"..\src2\theSet\set3.pkl"
+LOAD_PATH = r"..\src2\theSet\set3.pkl"
 LOAD = True
 
 def main() -> None:
     # 获取名称与数据时间集合字典
     nameToDataTimeSetDict = None
     if not LOAD:
-        nameToDataTimeSetDict = getNameToDataTimeSetDict(DATASET_PATH, INIT_DATA_PATH, SAVE_PATH)
+        nameToDataTimeSetDict = getNameToDataTimeSetDict(DATASET_PATH, INIT_DATA_PATH, TYPE_DATAS, SAVE_PATH)
     else:
         nameToDataTimeSetDict = loadNameToDataTimeSetDict(LOAD_PATH)
     if nameToDataTimeSetDict is None:
         return
     # 构建检测函数 angularSpeedX Gx
     standUnits = [
-        DetectionF.WindowPeak.StandUnit("angularSpeedY", 21, True, 107),
+        DetectionF.DetectionF.StandUnit("GYROSCOPE", "angularSpeedY", 21, True, 107),
+        # DetectionF.DetectionF.StandUnit("AUDIO", "values", 250, True, 0),
         # DetectionF.WindowPeak.StandUnit("angularSpeedX", 21, True, 0),
         # DetectionF.WindowPeak.StandUnit("angularSpeedZ", 21, True, 0),
         # DetectionF.WindowPeak.StandUnit("Gy", 200, True, 0),
         # DetectionF.WindowPeak.StandUnit("Gx", 400, True, 0),
         # DetectionF.WindowPeak.StandUnit("Gz", 400, True, 0),
     ]
-    detectionF = DetectionF.WindowPeakS(standUnits, windowSize= 2000)
-    # detectionF = DetectionF.WindowMaxEnergyPeak(standUnits, windowSize= 2000)
+    detectionF = DetectionF.WindowPeakSA(standUnits, windowSize= 2000)
     # 8 秒检测范围
-    plotList = [standUnit.stand for standUnit in standUnits]
     detectionNum, allNum, missAlarmNum = detectionEvalAcc(detectionF.midCheck, 4000, 500, nameToDataTimeSetDict, )
     print(f"detectionNum: {detectionNum}, allNum: {allNum}, missAlarmNum: {missAlarmNum}\
         \n accRate: {float(detectionNum) / float(allNum)}, missAlarmRate: {float(missAlarmNum) / float(allNum)}")
