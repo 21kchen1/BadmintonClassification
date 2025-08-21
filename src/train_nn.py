@@ -71,7 +71,7 @@ def train_nn(model, train_loader, criterion, optimizer):
     running_loss = 0.0
     correct_preds = 0
     total_preds = 0
-    
+
     for inputs, labels in train_loader:
         optimizer.zero_grad()
         outputs = model(inputs)
@@ -83,7 +83,7 @@ def train_nn(model, train_loader, criterion, optimizer):
         _, predicted = torch.max(outputs, 1)
         correct_preds += (predicted == labels).sum().item()
         total_preds += labels.size(0)
-    
+
     accuracy = 100 * correct_preds / total_preds
     avg_loss = running_loss / len(train_loader)
     return avg_loss, accuracy
@@ -99,7 +99,7 @@ def evaluate_model(model, val_loader):
             _, predicted = torch.max(outputs, 1)
             correct_preds += (predicted == labels).sum().item()
             total_preds += labels.size(0)
-    
+
     accuracy = 100 * correct_preds / total_preds
     return accuracy
 
@@ -118,10 +118,10 @@ def early_stopping(verify_acc, best_val_acc, patience, no_improvement):
 # 主函数
 if __name__ == "__main__":
     # 设置路径和文件
-    TRAIN_DATA_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_train_fft_normalized.csv"
-    VERIFY_DATA_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_verify_fft_normalized.csv"
-    TEST_DATA_CSV = "D:/vscode_work/badminton_classification/data/processed/processed_test_fft_normalized.csv"
-    
+    TRAIN_DATA_CSV = "../data/processed/processed_train_fft_normalized.csv"
+    VERIFY_DATA_CSV = "../data/processed/processed_verify_fft_normalized.csv"
+    TEST_DATA_CSV = "../data/processed/processed_test_fft_normalized.csv"
+
     # 特征列
     feature_columns = [
         "Ax_fft_mean", "Ax_fft_std", "Ax_fft_max", "Ax_dom_bin",
@@ -131,7 +131,7 @@ if __name__ == "__main__":
         "angularSpeedY_fft_mean", "angularSpeedY_fft_std", "angularSpeedY_fft_max", "angularSpeedY_dom_bin",
         "angularSpeedZ_fft_mean", "angularSpeedZ_fft_std", "angularSpeedZ_fft_max", "angularSpeedZ_dom_bin"
     ]
-    
+
     # 加载训练、验证和测试数据
     print("🚀 加载训练集数据...")
     train_df = load_data(TRAIN_DATA_CSV)
@@ -166,19 +166,19 @@ if __name__ == "__main__":
     best_val_acc = 0
     patience = 5  # 提前停止的耐心度
     no_improvement = 0
-    
+
     for epoch in range(EPOCHS):
         print(f"🚀 训练第 {epoch + 1} 轮...")
         train_loss, train_acc = train_nn(model, train_loader, criterion, optimizer)
         verify_acc = evaluate_model(model, verify_loader)
         print(f"✅ 训练损失: {train_loss:.4f}, 训练准确率: {train_acc:.2f}%")
         print(f"✅ 验证准确率: {verify_acc:.2f}%")
-        
+
         # 提前停止判断
         stop, best_val_acc, no_improvement = early_stopping(verify_acc, best_val_acc, patience, no_improvement)
         if stop:
             break
-    
+
     # 测试集评估
     test_acc = evaluate_model(model, test_loader)
     print(f"✅ 测试集准确率: {test_acc:.2f}%")
