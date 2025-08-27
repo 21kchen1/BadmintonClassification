@@ -14,14 +14,13 @@ import sys
 
 
 sys.path.append("..\\")
-from src2.testDetectF import DetectF, SlideWindowF, peckAudioJudge
+from src2.testDetectF import DetectF, SlideWindowF, peckAudioJudge, peckJudge
 from Util.DataFrame import getSubDataFrameDict
 import pickle
 from typing import Callable, Dict, List, Tuple, Union
 import pandas as pd
 import matplotlib.pyplot as plt
-from src2.DetectionPlot import compareTestDetection
-from src2 import DetectionF
+from src2.DetectionPlot import compareTestDetect, compareTestDetection
 from Util.Json import loadJson
 from Util.Path import getFPsByEndwith, getFPsByName
 
@@ -116,7 +115,7 @@ def loadNameToDataTimeSetDict(loadPath: str) -> Union[Dict[str, DataTimeSet], No
         nameToDataTimeSetDict = pickle.load(file)
     return nameToDataTimeSetDict
 
-def detectionEvalAcc(detectionF: Callable[[Dict[str, pd.DataFrame]], List[int]], checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plotList: Union[List[DetectionF.DetectionF.StandUnit], None]= None) -> Tuple[int, int, int]:
+def detectionEvalAcc(detectionF: Callable[[Dict[str, pd.DataFrame]], List[int]], checkHalfRange: int, bias: int, nameToDataTimeSetDict: Dict[str, DataTimeSet], plotList: Union[List[SlideWindowF.ConfigUnit], None]= None) -> Tuple[int, int, int]:
     """
     计算检测函数准确率
 
@@ -153,12 +152,10 @@ def detectionEvalAcc(detectionF: Callable[[Dict[str, pd.DataFrame]], List[int]],
             testDFD = getSubDataFrameDict(dataFrameDict, startT, endT)
             # 检测
             detectionT = detectionF(testDFD)
-            if len(detectionT) > 1:
-                print()
-            if len(detectionT) >= 1:
-                detectionT = detectionT[0]
-            elif len(detectionT) == 0:
+
+            if len(detectionT) == 0:
                 detectionT = -1
+            else: detectionT = detectionT[0]
 
             # 检测失败 是否在合理范围内
             if detectionT == -1 or abs(detectionT - midT) > bias:
@@ -167,7 +164,7 @@ def detectionEvalAcc(detectionF: Callable[[Dict[str, pd.DataFrame]], List[int]],
                 # 可视化失败类型
                 if plotList:
                     detectionDFD = getSubDataFrameDict(dataFrameDict, detectionT - checkHalfRange, detectionT + checkHalfRange)
-                    compareTestDetection(testDFD, midT, detectionDFD, detectionT, plotList, index= "unixTimestamp") # type: ignore
+                    compareTestDetect(testDFD, midT, detectionDFD, detectionT, plotList, index= "unixTimestamp")
                 print(f"{index} miss!")
                 continue
             # 检测成功
@@ -198,6 +195,7 @@ def main() -> None:
         SlideWindowF.ConfigUnit("GYROSCOPE", "angularSpeedY", 21, True, 107),
     ]
     detectionF = SlideWindowF(standUnits, peckAudioJudge(), windowSize= 2000)
+    # detectionF = SlideWindowF(standUnits, peckJudge(), windowSize= 2000)
     # 8 秒检测范围
     detectionNum, allNum, missAlarmNum = detectionEvalAcc(detectionF.check, 4000, 500, nameToDataTimeSetDict, )
     print(f"detectionNum: {detectionNum}, allNum: {allNum}, missAlarmNum: {missAlarmNum}\

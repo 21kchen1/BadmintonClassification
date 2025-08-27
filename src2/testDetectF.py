@@ -98,7 +98,8 @@ class SlideWindowF(DetectF):
         self._windowJudge = windowJudge
         self._windowSize = windowSize
 
-    def getSubDataFrameDict(self, dataFrameDict: DetectF.FormatData, startT: int, endT: int) -> Dict[str, pd.DataFrame]:
+    @staticmethod
+    def getSubDataFrameDict(dataFrameDict: DetectF.FormatData, startT: int, endT: int) -> Dict[str, pd.DataFrame]:
         """
         根据时间戳获取子数据框架字典
         1. 时间戳必须有序
@@ -114,8 +115,8 @@ class SlideWindowF(DetectF):
         subDataFrameDict = {}
         for typeName, dataFrame in dataFrameDict.items():
             # 找到时间戳范围的起始和结束索引
-            start_idx = dataFrame[self.THE_TIMESTAMP].searchsorted(startT, side="left")
-            end_idx = dataFrame[self.THE_TIMESTAMP].searchsorted(endT, side= "right")
+            start_idx = dataFrame[SlideWindowF.THE_TIMESTAMP].searchsorted(startT, side="left")
+            end_idx = dataFrame[SlideWindowF.THE_TIMESTAMP].searchsorted(endT, side= "right")
             # 切片数据
             subDataFrameDict[typeName] = dataFrame.iloc[start_idx:end_idx]
         return subDataFrameDict
@@ -252,11 +253,16 @@ class peckAudioJudge(SlideWindowF.WindowJudge):
         # maxTimestamp = int(windowDFD[standUnit.typeDataName].loc[theValues.idxmax()][SlideWindowF.THE_TIMESTAMP]) #type: ignore
         maxTimestamp = int(windowDFD[standUnit.typeDataName].loc[theValues.idxmax()][SlideWindowF.THE_TIMESTAMP].item())
 
-        audioValues = windowDFD["AUDIO"]["values"]
-        audioMaxTimestamp = int(windowDFD["AUDIO"].loc[audioValues.idxmax()][SlideWindowF.THE_TIMESTAMP].item()) if len(windowDFD["AUDIO"]) > 0 else -math.inf
+        timeLimit = 500
+
+        audioWindow = SlideWindowF.getSubDataFrameDict(windowDFD, maxTimestamp - timeLimit, maxTimestamp + timeLimit)
+
+        audioValues = audioWindow["AUDIO"]["values"]
+        audioMaxTimestamp = int(windowDFD["AUDIO"].loc[audioValues.idxmax()][SlideWindowF.THE_TIMESTAMP].item()) if len(audioValues) > 0 else -math.inf
 
         # 检查是否有值超过阈值
-        if theValues.max() >= standUnit.threshold and abs(audioMaxTimestamp - maxTimestamp) < 1000 and audioValues.max() >= 30:
+        if theValues.max() >= standUnit.threshold and (len(audioValues) <= 0 or audioValues.max() >= 30):
+        # if theValues.max() >= standUnit.threshold and abs(audioMaxTimestamp - maxTimestamp) <= 1000 and audioValues.max() >= 30:
         # if theValues.max() >= standUnit.threshold and audioValues.max() >= 30:
             return maxTimestamp + standUnit.bias
         return None
