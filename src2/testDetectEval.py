@@ -152,8 +152,12 @@ def detectionEvalAcc(detectionF: Callable[[Dict[str, pd.DataFrame]], List[int]],
             testDFD = getSubDataFrameDict(dataFrameDict, startT, endT)
             # 检测
             detectionT = detectionF(testDFD)
+            if len(detectionT) > 1:
+                if plotList:
+                    detectionDFD = getSubDataFrameDict(dataFrameDict, detectionT[0] - checkHalfRange, detectionT[0] + checkHalfRange)
+                    compareTestDetect(testDFD, midT, detectionDFD, detectionT[0], plotList, index= "unixTimestamp")
 
-            if len(detectionT) == 0:
+            if len(detectionT) <= 0:
                 detectionT = -1
             else: detectionT = detectionT[0]
 
@@ -197,7 +201,7 @@ def main() -> None:
     detectionF = SlideWindowF(standUnits, peckAudioJudge(), windowSize= 2000)
     # detectionF = SlideWindowF(standUnits, peckJudge(), windowSize= 2000)
     # 8 秒检测范围
-    detectionNum, allNum, missAlarmNum = detectionEvalAcc(detectionF.check, 4000, 500, nameToDataTimeSetDict, )
+    detectionNum, allNum, missAlarmNum = detectionEvalAcc(detectionF.check, 4000, 500, nameToDataTimeSetDict, standUnits)
     print(f"detectionNum: {detectionNum}, allNum: {allNum}, missAlarmNum: {missAlarmNum}\
         \n accRate: {float(detectionNum) / float(allNum)}, missAlarmRate: {float(missAlarmNum) / float(allNum)}")
 

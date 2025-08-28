@@ -194,7 +194,7 @@ class SlideWindowF(DetectF):
                 continue
 
             # 判断中值是否符合条件
-            judgeResult = self._windowJudge.check(self._configUnits,windowDFD)
+            judgeResult = self._windowJudge.check(self._configUnits, windowDFD)
 
             # 不符合条件
             if judgeResult is None:
@@ -260,8 +260,11 @@ class peckAudioJudge(SlideWindowF.WindowJudge):
         audioValues = audioWindow["AUDIO"]["values"]
         audioMaxTimestamp = int(windowDFD["AUDIO"].loc[audioValues.idxmax()][SlideWindowF.THE_TIMESTAMP].item()) if len(audioValues) > 0 else -math.inf
 
+        if len(audioValues) <= 0:
+            return None
+
         # 检查是否有值超过阈值
-        if theValues.max() >= standUnit.threshold and (len(audioValues) <= 0 or audioValues.max() >= 30):
+        if theValues.max() >= standUnit.threshold and audioValues.max() >= 30:
         # if theValues.max() >= standUnit.threshold and abs(audioMaxTimestamp - maxTimestamp) <= 1000 and audioValues.max() >= 30:
         # if theValues.max() >= standUnit.threshold and audioValues.max() >= 30:
             return maxTimestamp + standUnit.bias
